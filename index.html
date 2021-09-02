@@ -18,7 +18,7 @@
 
         .reload { margin-left: 1.9rem; margin-top: 1rem; }
 
-        #app { width: 300px; margin: auto; margin-top: 5rem; }
+        #app { width: 350px; margin: auto; margin-top: 5rem; }
     </style>
 </head>
 <body>
@@ -34,23 +34,37 @@
 
         <ul class="records">
             <h5>Рекорды: </h5>
-            <li v-for="record in records">X: {{ record.clickZ }} Z: {{ record.clickX }} - {{ record.date }}</li>
+            <li v-for="record in records">X: {{ record.clickZ }} Z: {{ record.clickX }} - {{ record.date }} <button class="btn btn-danger deleteRecord" @click="deleteRecord(record.id)"><i class="fas fa-trash"></i></button></li>
         </ul>
     </div>
 
+    <script src="https://kit.fontawesome.com/373834e38f.js" crossorigin="anonymous"></script>
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="text/javascript" defer>
+        let getRandId = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
+
         const app = new Vue({
             el: '#app',
             data: {
                 seconds: 60,
                 clickZ: 0,
                 clickX: 0,
-                records: []
+                records: [],
+                id: getRandId()
             },
             methods: {
                 reloadTimer: function() {
                     location.reload();
+                },
+
+                deleteRecord: function (id) {
+                    let elem = this.records.findIndex((record, index) => {
+                        if (record.id == id) {
+                            this.records.splice(index, 1);
+
+                            localStorage.setItem('records', this.records);
+                        }
+                    });
                 },
 
                 startCounter: function () {
@@ -92,7 +106,7 @@
                             this.records.push({
                                 clickZ: this.clickZ,
                                 clickX: this.clickX,
-                                date: `${date.getDate()}.${date.getMonth()}.${date.getFullYear()} ${date.getHours}:${date.getMinutes()}:${date.getSeconds()}`,
+                                date: `${date.getDate()}.${date.getMonth()}.${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`,
                             });
 
                             localStorage.setItem("records", JSON.stringify(this.records));
@@ -171,11 +185,13 @@
             title: 'Нажми Enter для начала'
         });
 
-        const recordsLC = JSON.parse(localStorage.getItem("records"));
+        try {
+            const recordsLC = JSON.parse(localStorage.getItem("records"));
 
-        if (recordsLC !== null) {
-            app.records = recordsLC;
-        }
+            if (recordsLC !== null) {
+                app.records = recordsLC;
+            }
+        } catch {}
     </script>
 </body>
 </html>
