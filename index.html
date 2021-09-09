@@ -19,8 +19,11 @@
         .records { margin-top: 2rem; }
 
         .reload { margin-left: 1.9rem; margin-top: 1rem; }
+        .reload, .bps, .bpm { position: relative; margin-top: 1rem; }
 
         #app { width: 350px; margin: auto; margin-top: 5rem; position: relative; color: #fff; }
+
+        .start-bpm { width: 100px; margin: auto; }
 
          /* Style the video: 100% width and height to cover the entire window */
         #myVideo {
@@ -38,24 +41,89 @@
     </video>
 
     <button class="btn btn-danger reload" @click="reloadTimer">Начать сначала</button>
+    <button class="btn btn-warning bps" onclick="switchMode(this)">BPS</button>
 
-    <div id="app">        
-        <h2 class="timer text-center">{{ seconds }}</h2>
+    <div id="app">
+        <div class="BPM-div" v-show="showBPM == true">
+            <h2 class="timer text-center">{{ seconds }}</h2>
 
-        <div class="keyboard">
-            <img src="keyboard_key_z.png" id="keyboard-z" class="keyboard">
-            <img src="keyboard_key_x.png" id="keyboard-x" class="keyboard">
+            <div class="keyboard">
+                <img src="keyboard_key_z.png" id="keyboard-z" class="keyboard">
+                <img src="keyboard_key_x.png" id="keyboard-x" class="keyboard">
+            </div>
+
+            <ul class="records">
+                <h5>Рекорды: </h5>
+                <li v-for="record in records">BPM: {{ (record.clickZ + record.clickX) / 2 }} - {{ record.date }} <button class="btn btn-danger deleteRecord" @click="deleteRecord(record.id)"><i class="fas fa-trash"></i></button></li>
+            </ul>
+
+            <button class="btn btn-success start-bpm" @click="startCounter">Начать</button>
+            <button class="btn btn-danger end-bpm" @click="endCounter">Закончить досрочно</button>
+        </div>        
+
+        <div class="BPS-div" v-show="showBPS == true">
+            <button class="btn btn-success showResults" onclick="showResultsBtn(this)">
+                Включить показ результатов (BPS)
+            </button>
         </div>
-
-        <ul class="records">
-            <h5>Рекорды: </h5>
-            <li v-for="record in records">Z: {{ record.clickZ }} X: {{ record.clickX }} - {{ record.date }} <button class="btn btn-danger deleteRecord" @click="deleteRecord(record.id)"><i class="fas fa-trash"></i></button></li>
-        </ul>
     </div>
 
     <script src="https://kit.fontawesome.com/373834e38f.js" crossorigin="anonymous"></script>
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="text/javascript" defer>
+        setInterval(function () {
+            if (app.showResults) {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 1000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                        toast.addEventListener('mouseenter', Swal.stopTimer)
+                        toast.addEventListener('mouseleave', Swal.resumeTimer)
+                    }
+                })
+
+                Toast.fire({
+                    icon: 'success',
+                    title: `BPS: ${app.clickBPS}`,
+                })
+            }
+
+            app.clickBPS = 0;
+        }, 1000);
+
+        function showResultsBtn(elem) {
+            if (app.showResults) {
+                app.showResults = false; 
+                elem.className = 'btn btn-success'; 
+                elem.innerHTML = 'Включить показ результатов (BPS)' 
+            } else { 
+                app.showResults = true; 
+                elem.className = 'btn btn-danger'; 
+                elem.innerHTML = 'Выключить показ результатов (BPS)' 
+            }
+        }
+
+        function switchMode(elem) {
+            console.log(app.showBPM, app.showBPS);
+
+            if (app.showBPS) {
+                app.showBPM = true;
+                app.showBPS = false;
+
+                elem.className = 'btn btn-warning bps'; 
+                elem.innerHTML = 'BPS' 
+            } else if (app.showBPM) {
+                app.showBPM = false; 
+                app.showBPS = true;
+
+                elem.className = 'btn btn-primary bpm'; 
+                elem.innerHTML = 'BPM' 
+            }
+        }
+
         let getRandId = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString();
 
         const app = new Vue({
@@ -65,7 +133,13 @@
                 clickZ: 0,
                 clickX: 0,
                 records: [],
-                id: getRandId()
+                id: getRandId(),
+
+                clickBPS: Math.round(0),
+                showResults: false,
+
+                showBPM: true,
+                showBPS: false,
             },
             methods: {
                 reloadTimer: function() {
@@ -74,17 +148,16 @@
 
                 deleteRecord: function (id) {
                     let elem = this.records.findIndex((record, index) => {
+                        console.log(record, id, record.id);
                         if (record.id == id) {
                             this.records.splice(index, 1);
 
-                            localStorage.setItem('records', this.records);
+                            localStorage.setItem('records', JSON.stringify(this.records));
                         }
                     });
                 },
 
                 startCounter: function () {
-                    let date = new Date();
-
                     this.clickZ = 0;
                     this.clickX = 0;
 
@@ -109,67 +182,53 @@
                         if (this.seconds > 0) {
                             this.seconds--;
                         } else if (this.seconds === 0) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Конец отсчета',
-                                html: `
-                                    <p style="color: blue;">Нажатий Z: </p> ${this.clickZ},
-                                    <p style="color: red;">Нажатий X: </p> ${this.clickX},
-                                `,
-                            });
-
-                            this.records.push({
-                                clickZ: this.clickZ,
-                                clickX: this.clickX,
-                                date: `${date.getDate()}.${date.getMonth()}.${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`,
-                            });
-
-                            localStorage.setItem("records", JSON.stringify(this.records));
-
+                            this.endCounter(timerInterval);
                             clearInterval(timerInterval);
-
-                            const Toast = Swal.mixin({
-                                toast: true,
-                                position: 'top-end',
-                                showConfirmButton: false,
-                                timer: 3000,
-                                timerProgressBar: true,
-                                didOpen: (toast) => {
-                                    toast.addEventListener('mouseenter', Swal.stopTimer)
-                                    toast.addEventListener('mouseleave', Swal.resumeTimer)
-                                }
-                            })
-
-                            Toast.fire({
-                                icon: 'success',
-                                title: 'Заканивай жмакать!'
-                            });
-
                         }
                     }, 1000);
                 },
 
-                keyUp: function (e) {
-                    console.log(e)
+                endCounter: function (timerInterval) {
+                    let date = new Date();
 
+                    this.records.push({
+                        clickZ: this.clickZ,
+                        clickX: this.clickX,
+                        id: getRandId(),
+                        date: `${date.getDate()}.${date.getMonth()}.${date.getFullYear()} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`,
+                    });
+
+                    localStorage.setItem("records", JSON.stringify(this.records));
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Конец отсчета',
+                        html: `
+                            <p style="color: blue;">Нажатий Z: </p> ${this.clickZ},
+                            <p style="color: red;">Нажатий X: </p> ${this.clickX},
+                        `,
+                    }).then(() => {
+                        location.reload();
+                    });
+                },
+
+                keyUp: function (e) {
                     if (e.keyCode === 90) {
                         this.clickZ++;
+                        this.clickBPS++;
 
-                        document.getElementById('keyboard-z').style.width = "80px";
                         document.getElementById('keyboard-z').style.height = "80px";
 
                         setTimeout(() => {
-                            document.getElementById('keyboard-z').style.width = "100px";
                             document.getElementById('keyboard-z').style.height = "100px";
                         });
                     } else if (e.keyCode == 88) {
                         this.clickX++;
+                        this.clickBPS++;
 
-                        document.getElementById('keyboard-x').style.width = "80px";
                         document.getElementById('keyboard-x').style.height = "80px";
 
                         setTimeout(() => {
-                            document.getElementById('keyboard-x').style.width = "100px";
                             document.getElementById('keyboard-x').style.height = "100px";
                         });
                     } else if (e.key === "Enter") {
